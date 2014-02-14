@@ -34,13 +34,13 @@ This is made up of 3 components; 1. worker threads, 2. queuemanager, 3. main thr
 3. Main thread - While worker and queuemanager threads are running; the main thread is in a loop sleeping for 1s; this was the easy way to get over the GIL issue (i.e. Ctrl+C doesn't work) in python when .join is used, so you can Ctrl+C out of it in case of an issue. Instead of using .join, the main thread uses a mechanism to exit out when those conditions are met.
 
 4. There is an interrupter thread that listens for commands:
-* "1": Show Proxy Stats; 
-* "2": Show Processing Stats; 
-* "3": Reload Proxy (if you update your proxy list; 
-* "4": Exit cleanly (i.e. finish off any currently running worker threads), 
-* "5": Run in python shell (i used this for debugging if an exception occurred on a thread), 
-* "6": export db to csv at current point in time
-* "7": export the proxy good/bad stats as csv, so you can analyze which ones need to be kicked out. 
+    * "1": Show Proxy Stats; 
+    * "2": Show Processing Stats; 
+    * "3": Reload Proxy (if you update your proxy list; 
+    * "4": Exit cleanly (i.e. finish off any currently running worker threads), 
+    * "5": Run in python shell (i used this for debugging if an exception occurred on a thread), 
+    * "6": export db to csv at current point in time
+    * "7": export the proxy good/bad stats as csv, so you can analyze which ones need to be kicked out. 
 
 As there are many printouts to the screen, it may appear as though you can't type it in, but you should just remember what you are typing and hit enter. This thread is not needed; and techincally should be part of the main, just didn't really want to mess with anything that was functional.
 
