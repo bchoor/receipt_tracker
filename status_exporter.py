@@ -7,10 +7,9 @@ mDb = mClient['trackitt']
 mUCases = mDb['u_cases']
 
 def export():
-	mCases = mUCases.find()
-	# {
-	# 				"form_type": "I485"
-	# 	})
+	mCases = mUCases.find({
+	 	"form_type": "I485"
+	 	})
 
 	fieldnames = [	
 		"receipt_number",
@@ -23,7 +22,8 @@ def export():
 		"last_updated_date_old",
 		"status_summary_old",
 		"timestamp",
-		"change_date"]
+		"change_date"
+		]
 
 	counter = 0
 	output_filename = 'output/status.csv'
@@ -31,10 +31,11 @@ def export():
 	if mCases.count() > 0:
 		with open(output_filename, 'wb') as csvfile:
 			writer = csv.DictWriter(
-						csvfile,
-						delimiter=",",
-						fieldnames=fieldnames,
-						extrasaction="ignore")
+				csvfile,
+				delimiter=",",
+				fieldnames=fieldnames,
+				extrasaction="ignore"
+				)
 			writer.writeheader()
 
 			for mCase in mCases:
