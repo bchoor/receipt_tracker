@@ -33,7 +33,7 @@ This script is made up of 3 components; 1. worker threads, 2. queuemanager, 3. m
 
 3. Main thread - While worker and queuemanager threads are running; the main thread is in a loop sleeping for 1s; this was the easy way to get over the GIL issue (i.e. Ctrl+C doesn't work) in python when .join is used, so you can Ctrl+C out of it in case of an issue. Instead of using .join, the main thread uses a mechanism to exit out when those conditions are met.
 
-4. There is an interrupter thread that listens for commands:
+4. There is an additional thread that listens for commands:
     * "1": Show Proxy Stats; 
     * "2": Show Processing Stats; 
     * "3": Reload Proxy (if you update your proxy list; 
