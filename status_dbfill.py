@@ -39,7 +39,7 @@ def main():
 	caseNumberRanges =  [
 							('SRC', 1490000001, 1490030000),
 							('SRC', 1490030001, 1490031000),
-							('SRC', 1390400001, 1390430000),
+							('SRC', 1390400001, 1390434002),
 						]
 
 	cases = mCases.find({"service_center": "SRC"}, {"_id":0, "receipt_number": 1})
@@ -60,7 +60,7 @@ def main():
 			if caseNumber in caseNumbers:
 				exist += 1
 			else:
-				#mCases.insert(case_new(caseNumberRange[0], caseNumber))
+				mCases.insert(case_new(caseNumberRange[0], caseNumber))
 				not_exist += 1
 
 		print "done", exist, not_exist

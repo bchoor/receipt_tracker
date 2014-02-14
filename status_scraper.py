@@ -34,10 +34,11 @@ pat_form = re.compile('.*Form(.*)[,].')
 pat_lud = re.compile('[Oo]n (\w+ \d{1,2},[ ]\d{4})')
 pat_casenumber = re.compile('.*(\d{10})')
 
+# status_summary RegEx patterns (only for I485 so far)
 rePats = 	[
 			(re.compile("fingerprint fee was accepted"), 0),
 			(re.compile("mailed the new card"), 0),
-			(re.compile("was not properly"), 0),
+			(re.compile("was not properly filed"), 0),
 			(re.compile("transferred"), 0),
 			(re.compile("registered this customer's new permanent"), 0),
 			(re.compile("USPS reported that your new card was delivered"), 0),
@@ -62,8 +63,20 @@ rePats = 	[
 		]
 
 # Filter parameters for query
-filter_forms = ["NEW"]
-filter_date = datetime(2014, 02, 15)
+filter_forms = [	# Other forms can also be added
+	"NEW",			
+	"I485"			
+	]
+filter_date = datetime(2014, 02, 13)	# Less than this date
+filter_status = [ 	# these are ignored
+	"Card/ Document Production"
+	]
+filter_status_summary = [	# these are ignored
+	"Was not properly filed",
+	"was not properly",
+	"Transferred",
+	"Mailed a notice acknowledging withdrawal of this application or petition i485"
+	]
 
 
 # Queues
@@ -282,7 +295,7 @@ def interrupter():
 				for p in proxies:
 					print "%s %d/%d" % (p["link"], p["good"], p["bad"])
 			elif inp == "4":
-				print "Request for EXIT detected; remaining items will be completed, no more saves will be made to the DB"
+				print "Exiting cleanly. %d items will finish processing." % aliveThreads
 				q_in.queue.clear()
 				print "q_in size is %d" % (q_in.qsize())
 
@@ -310,7 +323,9 @@ def interrupter():
 				finally:
 					lock.release()
 			elif inp == "6":
-				status_exporter.export()
+				status_exporter.exportStatus()
+			elif inp == "7":
+				status_exporter.exportProxies(proxies)
 			else:
 				print "Command '%s' was not recognized" % inp
 		except KeyboardInterrupt, e:
@@ -332,10 +347,13 @@ def main():
 	turnOff = False	
 	aliveThreads = 0
 
-	curCases = mUCases.find({"form_type": "NEW", 
-								"timestamp": {"$lt": filter_date}, 
-								"status": {"$ne": "Card/ Document Production"}
-								}).sort([("receipt_number", 1)])
+	curCases = mUCases.find({
+		"form_type": {"$in": filter_forms}, 
+		"timestamp": {"$lt": filter_date}, 
+		"status": {"$nin": filter_status},
+		"status_summary": {"$nin": filter_status_summary}
+		}).sort([("receipt_number", 1)])
+
 	totalRecords = curCases.count()
 
 	print "Total Records: %d" % totalRecords
@@ -389,7 +407,7 @@ def main():
 	print "Processing complete for %d records\n" % counter
 	logging.info("Finished processing for %d records\n" % counter)
 
-	status_exporter.export()
+	status_exporter.exportStatus()
 
 if __name__ == "__main__":
 	main()
