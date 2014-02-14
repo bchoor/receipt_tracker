@@ -37,10 +37,10 @@ def main():
 	mCases = dbconn("mongodb://localhost:27017/", "trackitt", "u_cases")
 
 	caseNumberRanges =  [
-							('SRC', 1490000001, 1490030000),
-							('SRC', 1490030001, 1490031000),
-							('SRC', 1390400001, 1390434002),
-						]
+		('SRC', 1390400001, 1390434002),	# Through end September
+		('SRC', 1490000001, 1490030000),	# Most of October
+		('SRC', 1490030001, 1490035000),	# Delta of October into November
+		]
 
 	cases = mCases.find({"service_center": "SRC"}, {"_id":0, "receipt_number": 1})
 
