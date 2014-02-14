@@ -12,7 +12,7 @@ A scraper to pull status of receipts. I am neither a developer nor a programmer 
 
 
 ##Additional information##
-1. List of proxies is in proxies.csv in folder of scripts; if you are scrapping large number of receipts (anything more than 4 hits/min will get your ip blocked).
+1. List of proxies is in proxies.csv in folder of scripts; if you are scrapping large number of receipts in a short window you might get your IP blocked for period of time.
 2. status_scraper will create a log in folder "logs/."
 3. status_exporter will create csv in folder "output/."
 
