@@ -18,14 +18,14 @@ A scraper to pull status of receipts. I am neither a developer nor a programmer 
 
 ##The Scripts##
 ###status_dbfill.py###
-This basically looks at the ranges and creates a bunch of empty records for gaps and flagging those records with a form_type of "NEW" (in status_scraper you can add "NEW" to the form_type filter)
+This basically looks at the ranges and identifies any gaps against the DB; whenever a gap is found, it creates a new record with the service_center/receipt_number and sets the form_type to "NEW"; this way it allows for a way for the other script (status_scraper.py) to find these new ones. The timestamp will also be updated; so when the status_scraper.py is run, it might be better to filter on only "NEW" form_type whenever your run this script. You might need to review the timestamp filter as well; since the timestamps on the new records will be very recent. I usually use a date in the future when I'm running it for the new records only; just to keep it simple.
 
 ###status_scraper.py###
-This is made up of 3 components; 1. worker threads, 2. queuemanager, 3. main thread
+This script is made up of 3 components; 1. worker threads, 2. queuemanager, 3. main thread
 
-1. Worker threads - In simple terms, there are x number of worker threads that run; each one is assigned a case (from a queue manager), it attempts to get the case by reading (i.e. scraping) the website. 
-    1. If a change is noted, the previous status is stored in the *_old fields; 
-    2. If its a new case, it'll update all fields;
+1. Worker threads - In simple terms, there are x number of worker threads that run; each one is assigned a case (from a queue manager), it attempts to get the case by reading (i.e. scraping) the website. It compares the record from the database with the once it scraped, and:
+    1. If a change is noted, the previous status is stored in the *_old fields; and the fields are updated including a "last_changed" field which is set to the current date.
+    2. If its a new case, it'll do exactly as above; though the *_old fields will be empty
     3. If no changes have occurred, only the timestamp will be updated. 
     4. If an exception occurred when reading the site (i.e. bad proxy, bad response, etc...), the case is re-queued for another worker thread to pick up. Once a worker thread completes its assigned case (or task) it will sleep for a pre-determined period of time (which you can vary). 
 
