@@ -1,4 +1,4 @@
-#uscis_status_exporter.def 
+#status_exporter.py
 import csv
 from pymongo import MongoClient
 
@@ -7,9 +7,22 @@ mDb = mClient['trackitt']
 mUCases = mDb['u_cases']
 
 def exportStatus():
+	''' Exports records for all I485 cases. It will also discard any cases that have
+		a status summary of "not properly filed", "transferred" or "withdrawal". It 
+		also filters out any cases that have a status of "Not Available", which occurs
+		sometimes when a case was present before, but then removed from the uscis system.
+
+	'''
 	mCases = mUCases.find({
 	 	"form_type": "I485"
-	 	})
+	 	"status_summary": {
+	 		"$nin": [
+	 			"was not properly filed",
+	 			"transferred",
+	 			"mailed a notice acknowledging withdrawal of this application or petition I485"
+	 		]},
+	 	"status": {"$ne": "Not Available"}
+	 	}).sort([("receipt_number", 1)])
 
 	fieldnames = [	
 		"receipt_number",
@@ -45,6 +58,11 @@ def exportStatus():
 	print "Written %d rows to '%s'." % (counter, output_filename)
 
 def exportProxies(proxies): # This is only called by status_scraper
+	''' exportProxies will export a csv of a list of proxies that is passed to it.
+		This should never be run on its own; it's run as part of the scraper. Instead,
+		a proxy class needs to be implemented; and this method should be incorporated
+		in there instead.
+	'''
 	fieldnames = [
 		"link",
 		"good",

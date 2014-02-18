@@ -20,79 +20,86 @@ import status_exporter
 
 url = "https://egov.uscis.gov/cris/Dashboard/CaseStatus.do"
 
-delay = 5
-dtToday = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-startTime = datetime.now()
+delay = 5								# Worker thread delay
+dtToday = datetime.now().replace( 		# Just get the date (remove time)
+			hour=0, 
+			minute=0, 
+			second=0, 
+			microsecond=0)  
+startTime = datetime.now()				# To calculate script processing stats
 
 # MongoDB connection details
 mClient = MongoClient('mongodb://localhost:27017/')
-mDb = mClient['trackitt']
-mUCases = mDb['u_cases']
+mDb = mClient['trackitt']				# Database name
+mUCases = mDb['u_cases']				# Table name (or collections)
 
 # RegEx pattern definitions
 pat_form = re.compile('.*Form(.*)[,].')
 pat_lud = re.compile('[Oo]n (\w+ \d{1,2},[ ]\d{4})')
 pat_casenumber = re.compile('.*(\d{10})')
 
-# status_summary RegEx patterns (only for I485 so far)
-rePats = 	[
-			(re.compile("fingerprint fee was accepted"), 0),
-			(re.compile("mailed the new card"), 0),
-			(re.compile("was not properly filed"), 0),
-			(re.compile("transferred"), 0),
-			(re.compile("registered this customer's new permanent"), 0),
-			(re.compile("USPS reported that your new card was delivered"), 0),
-			(re.compile("USPS reported that they picked up mail from USCIS"), 0),
-			(re.compile("ordered production of your new card"), 0),
-			(re.compile("notice requesting additional evidence or information"), 0),
-			(re.compile("received this I485 APPLICATION"), 0),
-			(re.compile("your (.*) was (updated|changed) relating to (your|the) I485"), 0),
-			(re.compile("response to our request for evidence"), 0),
-			(re.compile("mailed a notice requesting initial evidence"), 0),
-			(re.compile("mailed you a denial decision notice for this case"), 0),
-			(re.compile("mailed you a notice that we have approved"), 0),
-			(re.compile("you were advised to resubmit payment of the filing fee"), 0),
-			(re.compile("the post office returned the notice"), 0),
-			(re.compile("mailed you an appointment notice for an interview"), 0),
-			(re.compile("mailed the document to the address we have on file"), 0),
-			(re.compile("mailed a notice acknowledging withdrawal of this application or petition I485"), 0),
-			(re.compile("USPS reported that the card we mailed to you was flagged as undeliverable"), 0),
-			(re.compile("post office returned the Card we mailed to you as undeliverable"), 0),
-			(re.compile("ready for interview scheduling"), 0),
-			(re.compile("mailed you a continuation notice regarding your I485"), 0),
-		]
+# Status_summary RegEx patterns (only for I485 so far)
+rePats = [
+	(re.compile("fingerprint fee was accepted"), 0),
+	(re.compile("mailed the new card"), 0),
+	(re.compile("was not properly filed"), 0),
+	(re.compile("transferred"), 0),
+	(re.compile("registered this customer's new permanent"), 0),
+	(re.compile("USPS reported that your new card was delivered"), 0),
+	(re.compile("USPS reported that they picked up mail from USCIS"), 0),
+	(re.compile("ordered production of your new card"), 0),
+	(re.compile("notice requesting additional evidence or information"), 0),
+	(re.compile("received this I485 APPLICATION"), 0),
+	(re.compile("your (.*) was (updated|changed) relating to (your|the) I485"), 0),
+	(re.compile("response to our request for evidence"), 0),
+	(re.compile("mailed a notice requesting initial evidence"), 0),
+	(re.compile("mailed you a denial decision notice for this case"), 0),
+	(re.compile("mailed you a notice that we have approved"), 0),
+	(re.compile("you were advised to resubmit payment of the filing fee"), 0),
+	(re.compile("the post office returned the notice"), 0),
+	(re.compile("mailed you an appointment notice for an interview"), 0),
+	(re.compile("mailed the document to the address we have on file"), 0),
+	(re.compile("mailed a notice acknowledging withdrawal of this application or petition I485"), 0),
+	(re.compile("USPS reported that the card we mailed to you was flagged as undeliverable"), 0),
+	(re.compile("post office returned the Card we mailed to you as undeliverable"), 0),
+	(re.compile("ready for interview scheduling"), 0),
+	(re.compile("mailed you a continuation notice regarding your I485"), 0),
+	]
 
 # Filter parameters for query
-filter_forms = [	# Other forms can also be added
-	"NEW",			
-	"I485"			
+filter_forms = [						# Other forms can also be added
+	#"NEW",			
+    "I485"			
 	]
-filter_date = datetime(2014, 02, 13)	# Less than this date
-filter_status = [ 	# these are ignored
+filter_date = datetime(2014, 02, 15)	# Less than this date
+filter_status = [ 						# These are ignored
 	"Card/ Document Production"
 	]
-filter_status_summary = [	# these are ignored
-	"Was not properly filed",
-	"was not properly",
-	"Transferred",
-	"Mailed a notice acknowledging withdrawal of this application or petition i485"
+filter_status_summary = [				# These are ignored
+	"was not properly filed",
+	"transferred",
+	"mailed a notice acknowledging withdrawal of this application or petition I485"
 	]
-
 
 # Queues
 q_in = Queue(maxsize=0)
 lock = threading.Lock()
 numWorkers = 16
 
-#Logging Defaults
-logging.basicConfig(	filename="logs/status_" + datetime.now().strftime("%Y-%m-%d_%H%M") + ".log", 
-						level=logging.DEBUG,
-						format='%(asctime)s|%(levelname)s|%(message)s')
+# Logging Defaults
+logging.basicConfig(
+	filename="logs/status_" + datetime.now().strftime("%Y-%m-%d_%H%M") + ".log", 
+	level=logging.DEBUG,
+	format='%(asctime)s|%(levelname)s|%(message)s')
 
-# Setup proxy list
 def proxies_setup ():
+	''' Loads the proxies.csv file into the proxies array. the csv file is in this
+		format:
+		ip_Address:port 
+		XX.XX.XX.XX:XXXX
+	'''
 	global proxies
-	lock.acquire()
+	lock.acquire()					# Just in case another thread is trying to access the proxies array
 	try:
 		proxies = []
 		with open('proxies.csv','r') as f:
@@ -102,7 +109,10 @@ def proxies_setup ():
 		logging.info("Loaded proxies: %r" % proxies)
 	finally:
 		lock.release()	
+
 def proxies_get ():
+	''' Randomly picks a proxy from the proxy array. Consider using "random.choice"
+	'''
 	global proxies
 	lock.acquire()
 	try:
@@ -114,6 +124,9 @@ def proxies_get ():
 		lock.release()
 
 def get_page (values):
+	''' get page from website. It passes the receipt_number (from values) to the
+		request. It also uses a random proxy by calling proxies_get().
+	'''
 	data = urllib.urlencode(values)
 	proxy = proxies_get()
 	
@@ -133,6 +146,7 @@ def get_page (values):
 	except Exception, e:
 		proxy["bad"] += 1
 		raise Exception(["Issue in establishing proxy handler for: %r" % e])
+
 def casestatus_get (serviceCenter, caseNumber):
 	"""	casestatus_get
 		
@@ -258,20 +272,24 @@ def updateWorker(worker_num):
 def queueManager():
 	global curCases
 	global turnOff
+	global aliveThreads
 
 	while True:
-		if curCases.alive == False: 
-			turnOff = True
-
-		while curCases.alive and q_in.qsize() < (numWorkers - 3) and turnOff == False:
-			newCase = curCases.next()
-			if newCase:
+		try:
+			while q_in.qsize() < (numWorkers - 3) and turnOff == False:
+				newCase = curCases.next()
 				logging.info("queueManager adding new case to queue with receipt: %s%d" % (newCase["service_center"], newCase["receipt_number"]))
 				q_in.put(newCase)
-			else:
-				logging.info("queueManager could not find any more cases. Exiting.")
-				print("queueManager could not find any more cases. Exiting.")
+		except StopIteration, e:
+			logging.info("queueManager could not find any more cases. Exiting.")
+			turnOff = True
+		except pymongo.errrors.CursorNotFound, e:
+				logging.info("queueManager: cursor timed out; exiting. There might still be some un-finished cases, you might need to re-run the scraper.")
+				# Need to figure out a way to reload the cursor, instead of forcing a turn off
 				turnOff = True
+		except Exception, e:
+			logging.error("queueManager Exception: %r" % e)
+			turnOff = True
 
 		time.sleep(1)
 def interrupter():
@@ -368,7 +386,6 @@ def main():
 	else:
 		print "No records to update."
 		exit(0)
-
 
 	# crawler threads
 	for i in range(1,numWorkers+1):

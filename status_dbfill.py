@@ -2,8 +2,8 @@ from pymongo import MongoClient
 from datetime import datetime
 
 # Enter ranges in this format; e.g.
-# SC   Start       End        
-# SRC, 1490000001, 1490030000           
+# SC , Start     , End       ,
+# SRC, 1490000001, 1490030000,           
 # SRC, 1390400001, 1390430000,
 
 # Points of references
@@ -32,14 +32,14 @@ def case_new(serviceCenter, receiptNumber):
 			}
 	return case
 
-
 def main():
 	mCases = dbconn("mongodb://localhost:27017/", "trackitt", "u_cases")
 
-	caseNumberRanges =  [
+	caseNumberRanges = [
+		('SRC', 1390390001, 1390400000),	# More August/September
 		('SRC', 1390400001, 1390434002),	# Through end September
 		('SRC', 1490000001, 1490030000),	# Most of October
-		('SRC', 1490030001, 1490035000),	# Delta of October into November
+		('SRC', 1490030001, 1490040000),	# Delta of October into November
 		]
 
 	cases = mCases.find({"service_center": "SRC"}, {"_id":0, "receipt_number": 1})
@@ -48,10 +48,12 @@ def main():
 		exist = not_exist = 0
 		print "Reading array....%d" % (caseNumberRange[1]), 
 		caseNumbers = []
-		cases = mCases.find({"service_center": caseNumberRange[0],
-							"receipt_number": {"$gte": caseNumberRange[1], "$lte": caseNumberRange[2]}
-							}, 
-							{"_id":0, "receipt_number": 1})
+		cases = mCases.find({
+			"service_center": caseNumberRange[0],
+			"receipt_number": {"$gte": caseNumberRange[1], "$lte": caseNumberRange[2]}
+			}, 
+			{"_id":0, "receipt_number": 1}
+			)
 
 		for case in cases:
 			caseNumbers.append(case["receipt_number"])
