@@ -17,6 +17,8 @@ import threading
 import sys
 import math
 import status_exporter
+import SocketServer
+import json
 
 url = "https://egov.uscis.gov/cris/Dashboard/CaseStatus.do"
 
@@ -71,7 +73,7 @@ filter_forms = [						# Other forms can also be added
 	#"NEW",			
     "I485"			
 	]
-filter_date = datetime(2014, 02, 15)	# Less than this date
+filter_date = datetime(2014, 02, 27)	# Less than this date (year, month, day, hour, minute, second, millisecond)
 filter_status = [ 						# These are ignored
 	"Card/ Document Production"
 	]
@@ -80,6 +82,7 @@ filter_status_summary = [				# These are ignored
 	"transferred",
 	"mailed a notice acknowledging withdrawal of this application or petition I485"
 	]
+
 
 # Queues
 q_in = Queue(maxsize=0)
@@ -123,6 +126,25 @@ def proxies_get ():
 	finally:
 		lock.release()
 
+def proxy_remove(ip_address_port):
+	''' Removes the ipaddress:port pair
+		ip_address_port example: xx.xx.xx.xx:xx
+	'''
+	global proxies
+	try:
+		# remove from proxies array
+		for proxy in proxies:
+			if proxy["link"] == ip_address_port:
+				proxies.remove(proxy)
+
+		# update csv file, by cycling through the updated proxies array
+		with open("proxies.csv", "wb") as f:
+		 	for proxy in proxies:
+		 		f.write("%s\n" % proxy["link"] )
+
+	finally:
+		pass
+
 def get_page (values):
 	''' get page from website. It passes the receipt_number (from values) to the
 		request. It also uses a random proxy by calling proxies_get().
@@ -149,18 +171,17 @@ def get_page (values):
 
 def casestatus_get (serviceCenter, caseNumber):
 	"""	casestatus_get
-		
-		Parameters:
-			serviceCenter string
-			caseNumber longint
-		Returns:
-			dict of (this is laid out exactly like document for mUCases collection):
-				receipt_number: same as caseNumber
-				service_center: same as serviceCenter
-				status: short status
-				status_description: whole status paragraph
-				form_type: type of form (i.e. I-485)
-				last_updated_date: RegEx from status_description
+
+		Uses BeautifulSoup to parse through the results of a request to the site.
+		It has some exception handling, to identify:
+			1. bad response
+			2. IP blocked
+
+		The result set is a list of:
+			1. Case = Dict with keys "receipt_number", "service_center", "status", 
+				"status_description", "form_type", "last_updated_date"
+			2. Proxy = Dict with keys "link", "good", "bad". This is used in logging
+				to keep track of any bad proxies.
 	"""
 	appReceiptNum = serviceCenter + str(caseNumber)
 	values = {'appReceiptNum': appReceiptNum}
@@ -202,27 +223,33 @@ def casestatus_get (serviceCenter, caseNumber):
 				'last_updated_date': ""}, the_page[1])
 
 def fn_status_summary(statusDescription):
-	status_summary = ""
-	
+	''' Status Summary extractor
+		This function iterates through a list of Regular Expressions in the list
+		'rePats'. rePat is pair of a re.compile object and group number; the re.compile
+		object is used to search for a match using the parameter "statusDescription". If
+		a match is found, it assigns the group number of the match to the return
+	'''
 	for rePat in rePats:
 		reMatch = rePat[0].search(statusDescription)
 		if reMatch:
-			status_summary = reMatch.group(rePat[1])
-			break
+			return reMatch.group(rePat[1])
 	
-	return status_summary
+	return ""
 	
-def getlastcase ():
-	lastcase = mUCases.find().sort([('receipt_number', -1)]).limit(1)
-	if lastcase.count() > 0:
-		
-		return lastcase[0]['receipt_number']
-	else:
-		return caseNumber_start
-
 def updateWorker(worker_num):
+	''' Worker thread
+		Multiple instances of this function is spawned through main. The number is
+		controlled by numWorkers defined at the top.
+
+		This function checks the q_in queue; it if finds something it scrapes the
+		website and compares the results with the database. 
+			If a change is identified the current status is moved to the fields *_old; and the new status is saved. 
+			If no change, then at least the timestamp is touched
+	'''
 	global aliveThreads
 	global counter
+	global lastprocessedcase
+
 	while True:
 		case = q_in.get()
 
@@ -256,6 +283,7 @@ def updateWorker(worker_num):
 				counter += 1
 				lock.release()
 				print "%d Processed: %s%d" % (counter, case["service_center"], case["receipt_number"])
+				lastprocessedcase = "%s%d" % (case["service_center"], case["receipt_number"])
 
 				logging.info("#%s completed work on receipt: %s%d by %s, and will sleep for %d seconds" % (worker_num, case["service_center"], case["receipt_number"], case_updated[1]["link"],delay))
 				q_in.task_done()
@@ -270,6 +298,22 @@ def updateWorker(worker_num):
 
 		time.sleep(delay)
 def queueManager():
+	''' queueManager
+		On a 1s interval, it checks the size of q_in, and whether the "turnOff" flagged
+		has been set. It will fill q_in with next cases until q_in is < numWorkers - 3
+
+		the pymongo cursor has a timeout period, i.e. time after which the cursor is
+		not valid anymore. the current exception handling has done a poor job of 
+		effectively catching that timeout. what is occurring right now is the queueManager
+		has an exception, which does not get handled for some reason. this results in the 
+		thread to stop processing, and turnoff never gets flagged causing the system
+		to continue to loop with no new records to process. 
+
+		the implementation should effectively catch a timeout on the cursor, cleanly
+		stop the updateworker (or prevent a save), then reload the cursor where it stopped.
+		the issue is figuring out how to get the updateworker to stop processing once
+		such an error occurs; and to restart only once a the cursor is renewed.		
+	'''
 	global curCases
 	global turnOff
 	global aliveThreads
@@ -284,9 +328,9 @@ def queueManager():
 			logging.info("queueManager could not find any more cases. Exiting.")
 			turnOff = True
 		except pymongo.errrors.CursorNotFound, e:
-				logging.info("queueManager: cursor timed out; exiting. There might still be some un-finished cases, you might need to re-run the scraper.")
-				# Need to figure out a way to reload the cursor, instead of forcing a turn off
-				turnOff = True
+			logging.info("queueManager: cursor timed out; exiting. There might still be some un-finished cases, you might need to re-run the scraper.")
+			# Need to figure out a way to reload the cursor, instead of forcing a turn off
+			turnOff = True
 		except Exception, e:
 			logging.error("queueManager Exception: %r" % e)
 			turnOff = True
@@ -351,12 +395,107 @@ def interrupter():
 		except Exception, e:
 			print "Exception noted: %r" % e
 
+'''
+The following classes have been implemented to allow an external process (e.g.)
+cgi-bin script running independently to get processing information statistics. It 
+also presents a set of commands that is abstracted through the cgi-bin script. 
+"GET":
+	1. Stats
+
+"DO":
+	1. export csv 
+	2. reload proxy list
+	3. delete a proxy server
+'''
+class MyTCPServer(SocketServer.ThreadingTCPServer):
+	daemon_threads = True
+	allow_reuse_address = True
+
+class MyTCPServerHandler(SocketServer.BaseRequestHandler):
+	''' Handler of client connections
+	'''
+	def handle(self):
+		global turnOff
+		global proxies
+		global counter
+		global aliveThreads
+		global totalRecords
+
+		try:
+			message_in = self.request.recv(1024).strip()
+			print "message_in: %s, %d" % (message_in, len(message_in)),
+			if len(message_in) > 0:
+				data = json.loads(message_in)
+				print "%r" % data
+				if data["message"] == "GET" and data["action"] == "1":
+					self.request.sendall(json.dumps({
+						"status": "OK",
+						"request_type": "GET",
+						"data": {
+							"turnOff": turnOff,
+							"lastprocessedcase": lastprocessedcase,
+							"proxies": proxies,
+							"counter": counter,
+							"aliveThreads": aliveThreads,
+							"totalRecords": totalRecords,
+							"currentdatetime": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+							"starttime": startTime.strftime("%Y-%m-%dT%H:%M:%S.%f")
+							}
+						}))
+				elif data["message"] == "DO" and data["action"] == "1":
+					# export csv; copy to folder /var/www/.
+					# send link of csv to requester
+					status_exporter.exportStatus()
+					#shutil.copy("output/status.csv", "/var/www/status.csv")
+					self.request.sendall(json.dumps({
+						"status": "OK",
+						"request_type": "DO/1",
+						"data": "status.csv"
+						}))
+				elif data["message"] == "DO" and data["action"] == "2":
+					# reload proxy list
+					proxies_setup()
+					self.request.sendall(json.dumps({
+						"status": "OK",
+						"request_type": "DO/2",
+						"data": ""
+						}))
+				elif data["message"] == "DO" and data["action"] == "3":
+					# delete a poxy server
+					proxy_remove(data["data"]["ip"])
+
+					# 
+					self.request.sendall(json.dumps({
+						"status": "OK",
+						"request_type": "DO/3",
+						"data": data["data"]
+						}))
+				else:
+					self.request.sendall(json.dumps({
+						"status": "OK",
+						"request_type": "%s/%s" % (data["message"], data["action"]),
+						"data": "Not yet implemented."
+						}))
+
+		except Exception, e:
+			print "Exception while receiving message: %r" % e
+
+
+def server():
+	global tcp_server
+	tcp_server = MyTCPServer(("localhost", 8000), MyTCPServerHandler)
+	tcp_server.serve_forever()
+
 def main():
 	global curCases
 	global counter
 	global turnOff
 	global aliveThreads
 	global totalRecords
+	global tcp_server
+	global lastprocessedcase
+
+	lastprocessedcase = ""
 
 	logging.info("Started")
 
@@ -369,7 +508,7 @@ def main():
 		"form_type": {"$in": filter_forms}, 
 		"timestamp": {"$lt": filter_date}, 
 		"status": {"$nin": filter_status},
-		"status_summary": {"$nin": filter_status_summary}
+		"status_summary": {"$nin": filter_status_summary},
 		}).sort([("receipt_number", 1)])
 
 	totalRecords = curCases.count()
@@ -404,11 +543,17 @@ def main():
 	t.daemon = True
 	t.start()
 
+	# server thread
+	t = Thread(target=server)
+	t.daemon = True
+	t.start()
+
 	print dtToday
 
 	while True:
 		try:
 			if turnOff == True and q_in.empty() == True and aliveThreads < 1:
+				tcp_server.shutdown()
 				break
 
 			print q_in.qsize(), q_in.empty(), turnOff, threading.activeCount(), aliveThreads, curCases.alive
