@@ -11,10 +11,5 @@ A scraper to pull status of receipts. I am neither a developer nor a programmer 
 5. Requests - this library is much cleaner for making web requests; the current implementation is using standard python library (urllib and urllib2); but if I have time I would like to move to using the Requests library instead
 6. All other libraries are standard python ones.
 
-##Additional information##
-1. List of proxies is in proxies.csv in folder of scripts; if you are scrapping large number of receipts in a short window you might get your IP blocked for period of time.
-2. status_scraper will create a log in folder "logs/."
-3. status_exporter will create csv in folder "output/."
-
 ##Running the scripts##
 Refer to how_to_run for inforamtion on how to setup and run the scripts.
