@@ -42,8 +42,6 @@ def main():
 		('SRC', 1490030001, 1490040000),	# Delta of October into November
 		]
 
-	cases = mCases.find({"service_center": "SRC"}, {"_id":0, "receipt_number": 1})
-
 	for caseNumberRange in caseNumberRanges:
 		exist = not_exist = 0
 		print "Reading array....%d" % (caseNumberRange[1]), 
@@ -55,8 +53,7 @@ def main():
 			{"_id":0, "receipt_number": 1}
 			)
 
-		for case in cases:
-			caseNumbers.append(case["receipt_number"])
+		caseNumbers = [case["receipt_number"] for case in cases]
 
 		for caseNumber in range(caseNumberRange[1], caseNumberRange[2]+1):
 			if caseNumber in caseNumbers:
