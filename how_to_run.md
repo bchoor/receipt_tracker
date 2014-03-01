@@ -3,7 +3,8 @@ This file provides an overview of how you would run this set of scripts. This as
 1. Install Python 2.7 (from python.org); as of this day the latest version for 2.7 is 2.7.6 and can be downloaded from here: http://python.org/download/releases/2.7.6/
 
 2. Set you environment variable: 
-  1. In Windows, you can do that from Right-Click "My Computer" > Advanced System Settings > Advanced > "Environment Variables". Under System Variables, find "PATH" and append the folder that has the python executable. In Linux or Mac, you won't need to do anything.
+  1. In Windows, you can do that from Right-Click "My Computer" > Advanced System Settings > Advanced > "Environment Variables". Under System Variables, find "PATH" and append the folder that has the python executable. 
+  2. In Linux or Mac, you won't need to do anything.
 
 3. Install pip or ez_install; pip and ez_install are package managers for Python. In other words if there are certain python libraries you need, you can install them easily through these. 
   1. Information on how to install pip: http://www.pip-installer.org/en/latest/installing.html
