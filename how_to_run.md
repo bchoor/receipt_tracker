@@ -42,7 +42,7 @@ This file provides an overview of how you would run this set of scripts. This as
 
 ###Running the scripts
 11. Run python status_dbfill.py
-  This script will go through the range of values that you have entered in the script (see #8). It will iterate through each number within the range and if a record does not exist, it will create one. If one exists, it just skips it. When it creates a record it flags the "form_type" field as "NEW". The timestamp is also updated; the reason for even having a timestamp is because I ran into some issues at some point where if a timestamp was not established the filter for date wouldn't work correctly across the database.
+  This script will go through the range of values that you have entered in the script (see #1 under "Setting up the scripts"). It will iterate through each number within the range and if a record does not exist, it will create one. If one exists, it just skips it. When it creates a record it flags the "form_type" field as "NEW". The timestamp is also updated; the reason for even having a timestamp is because I ran into some issues at some point where if a timestamp was not established the filter for date wouldn't work correctly across the database.
 
 12. Run python status_scraper.py. 
   For the first time as pointed out in #9, you will be seeking only "NEW" records. 
