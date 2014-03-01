@@ -21,19 +21,74 @@ import SocketServer
 import json
 
 url = "https://egov.uscis.gov/cris/Dashboard/CaseStatus.do"
-
+numWorkers = 16							# Number of Workers
 delay = 5								# Worker thread delay
+
+class db:
+	# Filter parameters for query
+	_filter_forms = [						# Other forms can also be added
+		#"NEW",			
+	    "I485"			
+		]
+	_filter_date = datetime(2014, 02, 28)	# Less than this date (year, month, day, hour, minute, second, millisecond)
+	_filter_status = [ 						# These are ignored
+		"Card/ Document Production"
+		]
+	_filter_status_summary = [				# These are ignored
+		"was not properly filed",
+		"transferred",
+		"mailed a notice acknowledging withdrawal of this application or petition I485"
+		]
+
+	_conn_u_cases = None
+	u_cases = None
+	u_cases_recordnumber = -1 			# u_cases_next incr 1; so we want 1st to be 0
+	u_cases_totalrecords = 0
+
+	def __init__(self):
+		# DB Connection Details
+		mClient = MongoClient('mongodb://localhost:27017/')
+		mDb = mClient['trackitt']					# Database name
+		self._conn_u_cases = mDb['u_cases']			# Table name (or collections)
+
+	def u_cases_find(self):
+		curCases = self._conn_u_cases.find({
+			"form_type": {"$in": self._filter_forms}, 
+			"timestamp": {"$lt": self._filter_date}, 
+			"status": {"$nin": self._filter_status},
+			"status_summary": {"$nin": self._filter_status_summary},
+			}).sort([("receipt_number", 1)])
+
+		# Convert cursor (curCases) results to a list of records
+		# Each record is a python dict
+		# By iterating through a list instead of the cursor, we don't have to worry
+		# about cursor timeouts
+		self.u_cases = list(curCases)
+		self.u_cases_totalrecords = len(self.u_cases)
+
+	def u_cases_next(self):
+		''' Returns a Dict of field/value pairs
+		'''
+		self.u_cases_recordnumber += 1
+
+		if self.u_cases_recordnumber < self.u_cases_totalrecords:
+			return self.u_cases[self.u_cases_recordnumber]
+		else:
+			raise Exception("No more records.")
+
+	def u_cases_save(self, case):
+		''' Takes a Dict of field/value pairs and saves to the database
+			In Mongo, it includes the _id field which is what is used
+			as key for making the save
+		'''
+		self._conn_u_cases.save(case)
+
 dtToday = datetime.now().replace( 		# Just get the date (remove time)
 			hour=0, 
 			minute=0, 
 			second=0, 
 			microsecond=0)  
 startTime = datetime.now()				# To calculate script processing stats
-
-# MongoDB connection details
-mClient = MongoClient('mongodb://localhost:27017/')
-mDb = mClient['trackitt']				# Database name
-mUCases = mDb['u_cases']				# Table name (or collections)
 
 # RegEx pattern definitions
 pat_form = re.compile('.*Form(.*)[,].')
@@ -68,26 +123,9 @@ rePats = [
 	(re.compile("mailed you a continuation notice regarding your I485"), 0),
 	]
 
-# Filter parameters for query
-filter_forms = [						# Other forms can also be added
-	#"NEW",			
-    "I485"			
-	]
-filter_date = datetime(2014, 02, 27)	# Less than this date (year, month, day, hour, minute, second, millisecond)
-filter_status = [ 						# These are ignored
-	"Card/ Document Production"
-	]
-filter_status_summary = [				# These are ignored
-	"was not properly filed",
-	"transferred",
-	"mailed a notice acknowledging withdrawal of this application or petition I485"
-	]
-
-
 # Queues
 q_in = Queue(maxsize=0)
 lock = threading.Lock()
-numWorkers = 16
 
 # Logging Defaults
 logging.basicConfig(
@@ -249,6 +287,7 @@ def updateWorker(worker_num):
 	global aliveThreads
 	global counter
 	global lastprocessedcase
+	global UCases
 
 	while True:
 		case = q_in.get()
@@ -279,7 +318,7 @@ def updateWorker(worker_num):
 
 				case["timestamp"] = datetime.now()
 				lock.acquire()
-				mUCases.save(case)
+				UCases.u_cases_save(case)
 				counter += 1
 				lock.release()
 				print "%d Processed: %s%d" % (counter, case["service_center"], case["receipt_number"])
@@ -314,14 +353,14 @@ def queueManager():
 		the issue is figuring out how to get the updateworker to stop processing once
 		such an error occurs; and to restart only once a the cursor is renewed.		
 	'''
-	global curCases
+	global UCases
 	global turnOff
 	global aliveThreads
 
 	while True:
 		try:
 			while q_in.qsize() < (numWorkers - 3) and turnOff == False:
-				newCase = curCases.next()
+				newCase = UCases.u_cases_next()
 				logging.info("queueManager adding new case to queue with receipt: %s%d" % (newCase["service_center"], newCase["receipt_number"]))
 				q_in.put(newCase)
 		except StopIteration, e:
@@ -396,16 +435,16 @@ def interrupter():
 			print "Exception noted: %r" % e
 
 '''
-The following classes have been implemented to allow an external process (e.g.)
-cgi-bin script running independently to get processing information statistics. It 
-also presents a set of commands that is abstracted through the cgi-bin script. 
-"GET":
-	1. Stats
+	The following classes have been implemented to allow an external process (e.g.)
+	cgi-bin script running independently to get processing information statistics. It 
+	also presents a set of commands that is abstracted through the cgi-bin script. 
+	"GET":
+		1. Stats
 
-"DO":
-	1. export csv 
-	2. reload proxy list
-	3. delete a proxy server
+	"DO":
+		1. export csv 
+		2. reload proxy list
+		3. delete a proxy server
 '''
 class MyTCPServer(SocketServer.ThreadingTCPServer):
 	daemon_threads = True
@@ -487,7 +526,7 @@ def server():
 	tcp_server.serve_forever()
 
 def main():
-	global curCases
+	global UCases
 	global counter
 	global turnOff
 	global aliveThreads
@@ -504,23 +543,18 @@ def main():
 	turnOff = False	
 	aliveThreads = 0
 
-	curCases = mUCases.find({
-		"form_type": {"$in": filter_forms}, 
-		"timestamp": {"$lt": filter_date}, 
-		"status": {"$nin": filter_status},
-		"status_summary": {"$nin": filter_status_summary},
-		}).sort([("receipt_number", 1)])
+	UCases = db()
+	UCases.u_cases_find()
 
-	totalRecords = curCases.count()
-
-	print "Total Records: %d" % totalRecords
+	totalRecords = UCases.u_cases_totalrecords
+	print "Total Records: %r" % totalRecords
 
 	# get first x records, and load into queue (q_in)
-	if curCases.count() >= numWorkers + 1:
+	if UCases.u_cases_totalrecords >= numWorkers + 1:
 		for i in range(0, numWorkers + 1):
-			q_in.put(curCases.next())
-	elif curCases.count() > 0:
-		for i in curCases:
+			q_in.put(UCases.u_cases_next())
+	elif UCases.u_cases_totalrecords > 0:
+		for i in curCases.u_cases:
 			q_in.put(i)
 	else:
 		print "No records to update."
@@ -556,7 +590,7 @@ def main():
 				tcp_server.shutdown()
 				break
 
-			print q_in.qsize(), q_in.empty(), turnOff, threading.activeCount(), aliveThreads, curCases.alive
+			print q_in.qsize(), q_in.empty(), turnOff, threading.activeCount(), aliveThreads
 			time.sleep(5)
 		except KeyboardInterrupt, e:
 			print "Keyboard Interrupt detected."
