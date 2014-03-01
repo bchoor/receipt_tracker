@@ -31,9 +31,29 @@ This file provides an overview of how you would run this set of scripts. This as
 
 9. Edit status_scraper.py; find the filter parameters and change it to "NEW" for form_type, and for date put in a date in the future (just for this first time).
 
-10. Run python status_dbfill.py
+10. Create "proxies.csv" and enter a list of proxies. You can find free ones by googling. Each proxy server should be entered in this format xx.xx.xx.xx:port (example: 12.34.53.53:8080). Not all proxies work, so it's a good practice to keep track of how each is doing (there are some stats avail as the status_scraper.py is running - see #13)
+  Create an "output" folder and a "logs" folder; this is where the logs and output files will be generated.
 
-11. Run python status_scraper.py
+11. Run python status_dbfill.py
+  This script will go through the range of values that you have entered in the script (see #8). It will iterate through each number within the range and if a record does not exist, it will create one. If one exists, it just skips it. When it creates a record it flags the "form_type" field as "NEW". The timestamp is also updated; the reason for even having a timestamp is because I ran into some issues at some point where if a timestamp was not established the filter for date wouldn't work correctly across the database.
+
+12. Run python status_scraper.py. 
+  For the first time as pointed out in #9, you will be seeking only "NEW" records. 
+
+  As the script starts to run it'll print a bunch of records. You can get a variety of different stats and do a few tasks.
+
+13. Interacting with status_scraper.py
+  Amidst the bunch of text showing up on the screen there are few commands you can use to get some statistics on the scraper process. Just hit the number followed by enter.
+  1. "1" - Shows Proxy stats. Displays a list of all proxies, and gives good/bad counter.
+  2. "2" - Shows progress stats; i.e. how many processed, total records, estimated completion, etc.
+  3. "3" - Reload proxy list. This happens if you have determined there are bad proxies, and you fix the proxies.csv file, but don't want to restart the whole process. 
+  4. "4" - Exit cleanly. This commands cleans the queue, allows the cases currently being processed to finish off and then exit. It will export all I485s to output/status.csv
+  5. "5" - allows executing python code. this was mostly used for debugging.
+  6. "6" - Export all I485 records to the output/status.csv file
+  7. "7" - Export the proxy stats (same as 1), but outputs to the output/proxies.csv; i usually plug this in excel to determine by good/bad ratio and determine which proxies to toss out. The proxy list is the only maintenance I have had to do on this script; since new ones come online and others go out.
+  
+14. At the end of the script; it exports all I485s to output/status.csv. You can tweak status_exporter.py to include other form_types if needed. This will impact the exports in #13 as well.
+
 
 Ask me any questions through here; so I can more effectively address any issues.
 
