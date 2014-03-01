@@ -8,7 +8,7 @@ This file provides an overview of how you would run this set of scripts. This as
 
 3. Install pip or ez_install; pip and ez_install are package managers for Python. In other words if there are certain python libraries you need, you can install them easily through these. 
   1. Information on how to install pip: http://www.pip-installer.org/en/latest/installing.html
-  2. Basically, you download the "get-pip.py" (link in the web page), and then run it. If your environment variable (PATH) was properly configured in #2, you should be able to just run in command prompt "python get-pip.py" in the location you have downloaded the get-pip.py file.
+  2. Basically, you download the "get-pip.py" (link in the web page in the above bullet), and then run it. If your environment variable (PATH) was properly configured in #2, you should be able to just run in command prompt "python get-pip.py" in the location you have downloaded the get-pip.py file.
 
 4. Install python libraries. In command prompt, type in 
   1. "pip install requests" to install the requests library
