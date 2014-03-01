@@ -12,6 +12,7 @@ This file provides an overview of how you would run this set of scripts. This as
 
 4. Install python libraries. In command prompt, type in 
   1. "pip install requests" to install the requests library
+  2. "pip install BeautifulSoup" to install BeautifulSoup library. This is the library that does the parsing of the response back from the website and pulls the relevant information.
   2. "pip install pymongo" to install the mongo database library. a quick note is that you could use any database, but you would need to update the code wherever there are db calls. I have created a "db" class in status_scraper.py for all database calls; there aren't very many. Really only 2; 1 to pull the list to iterate through, and the 2nd to save any updates back to the DB. A dict (or dictionary) of key/value pairs (i.e. field and value) is passed back and forth; so should be easy to implement any database. One side note, a suggestion is to move out of using cursors; instead convert the cursor into a list; and I implemented a dirty "next()" function to pull the next record by using a counter.
 
 5. Install MongoDB. I have very limited database experience, so MongoDB was simple and easy enough for me.
