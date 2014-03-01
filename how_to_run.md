@@ -16,9 +16,15 @@ This file provides an overview of how you would run this set of scripts. This as
   2. "pip install pymongo" to install the mongo database library. a quick note is that you could use any database, but you would need to update the code wherever there are db calls. I have created a "db" class in status_scraper.py for all database calls; there aren't very many. Really only 2; 1 to pull the list to iterate through, and the 2nd to save any updates back to the DB. A dict (or dictionary) of key/value pairs (i.e. field and value) is passed back and forth; so should be easy to implement any database. One side note, a suggestion is to move out of using cursors; instead convert the cursor into a list; and I implemented a dirty "next()" function to pull the next record by using a counter.
 
 5. Install MongoDB. I have very limited database experience, so MongoDB was simple and easy enough for me.
+  1. Download MongoDB: http://www.mongodb.org/downloads
+  2. Instructions for install MongoDB: http://docs.mongodb.org/manual/tutorial/install-mongodb-on-windows/
+
+  One note is that you don't need to create a database or table (or collection); Mongo will automatically create it once a record is inserted. When you run the status_db_fill.py, it will create the records so no need to do anything once you have it ready and going.
 
 6. Install MongoVUE, if you need a way to visually see the database (i.e. collections are equivalent to tables, and documents are equivalent to records). As your database gets bigger, you might need to add some indexes and MongoVUE helps. It also has a free version which is plenty for what I needed it for.
-
+  1. Download MongoVUE: http://www.mongovue.com/downloads/
+  2. Instructions are very straight forward; like installing any other windows programs. It's a .NET application, so it might need to download/install some updates. I am fairly certain this tool is available only for Windows.
+  
 7. Once you have your MongoDB running; you might need to run that in a separate command prompt. In Mac or Linux, it runs as a service (i.e. daemon). 
 
 8. Edit status_dbfill.py; look at the ranges and configure as needed. for a first try, I would do just a few hundred records. Refresh your view in MongoVUE, look at the "u_cases" collection and you will find a bunch of empty records.
