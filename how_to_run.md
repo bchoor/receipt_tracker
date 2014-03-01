@@ -1,5 +1,9 @@
+##How to Use the Receipt Tracker
+
+###Intro
 This file provides an overview of how you would run this set of scripts. This assumes you have none of the dependencies installed.
 
+### Installation of Dependencies
 1. Install Python 2.7 (from python.org); as of this day the latest version for 2.7 is 2.7.6 and can be downloaded from here: http://python.org/download/releases/2.7.6/
 
 2. Set you environment variable: 
@@ -27,6 +31,7 @@ This file provides an overview of how you would run this set of scripts. This as
   
 7. Once you have your MongoDB running; you might need to run that in a separate command prompt. In Mac or Linux, it runs as a service (i.e. daemon). 
 
+###Setting up the scripts
 8. Edit status_dbfill.py; look at the ranges and configure as needed. for a first try, I would do just a few hundred records. Refresh your view in MongoVUE, look at the "u_cases" collection and you will find a bunch of empty records.
 
 9. Edit status_scraper.py; find the filter parameters and change it to "NEW" for form_type, and for date put in a date in the future (just for this first time).
@@ -34,6 +39,8 @@ This file provides an overview of how you would run this set of scripts. This as
 10. Create "proxies.csv" and enter a list of proxies. You can find free ones by googling. Each proxy server should be entered in this format xx.xx.xx.xx:port (example: 12.34.53.53:8080). Not all proxies work, so it's a good practice to keep track of how each is doing (there are some stats avail as the status_scraper.py is running - see #13)
   Create an "output" folder and a "logs" folder; this is where the logs and output files will be generated.
 
+
+###Running the scripts
 11. Run python status_dbfill.py
   This script will go through the range of values that you have entered in the script (see #8). It will iterate through each number within the range and if a record does not exist, it will create one. If one exists, it just skips it. When it creates a record it flags the "form_type" field as "NEW". The timestamp is also updated; the reason for even having a timestamp is because I ran into some issues at some point where if a timestamp was not established the filter for date wouldn't work correctly across the database.
 
