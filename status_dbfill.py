@@ -12,6 +12,11 @@ from datetime import datetime
 # SRC1390434002 (Last of FY13)
 # SRC1490105000 Jan 3, 2014
 
+caseNumberRanges = [
+	('SRC', 1390390001, 1390434000, datetime(2013, 8, 22)),	
+	('SRC', 1490000001, 1490105000, datetime(2013, 10, 1)),
+	]
+
 def dbconn(connectionString, dbName, collectionName):
 	mClient = MongoClient(connectionString)
 	mDb = mClient[dbName]
@@ -35,11 +40,6 @@ def case_new(serviceCenter, receiptNumber):
 
 def dbfill():
 	mCases = dbconn("mongodb://localhost:27017/", "trackitt", "u_cases")
-
-	caseNumberRanges = [
-		('SRC', 1390390001, 1390434000, datetime(2013, 8, 22)),	
-		('SRC', 1490000001, 1490105000, datetime(2013, 10, 1)),
-		]
 
 	for caseNumberRange in caseNumberRanges:
 		exist = not_exist = 0
@@ -66,11 +66,6 @@ def dbfill():
 def dbfill_noticedates():
 	mCases = dbconn("mongodb://localhost:27017/", "trackitt", "u_cases")
 
-	caseNumberRanges = [
-		('SRC', 1390390001, 1390434000, datetime(2013, 8, 21)),	
-		('SRC', 1490000001, 1490105000, datetime(2013, 10, 1)),	
-		]
-
 	for caseNumberRange in caseNumberRanges:
 		cases = mCases.find({
 			"form_type": "I485",
@@ -90,7 +85,7 @@ def dbfill_noticedates():
 
 
 def main():
-	dbfill_noticedates()
+	dbfill()
 
 if __name__ == "__main__":
 	main()
