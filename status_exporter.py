@@ -1,6 +1,7 @@
 #status_exporter.py
 import csv
 from pymongo import MongoClient
+from datetime import datetime
 
 mClient = MongoClient('mongodb://localhost:27017/')
 mDb = mClient['trackitt']
@@ -14,11 +15,10 @@ def exportStatus():
 
 	'''
 	mCases = mUCases.find({
-	 	"form_type": "I485"
+	 	"form_type": "I485",
 	 	"status_summary": {
 	 		"$nin": [
 	 			"was not properly filed",
-	 			"transferred",
 	 			"mailed a notice acknowledging withdrawal of this application or petition I485"
 	 		]},
 	 	"status": {"$ne": "Not Available"}
@@ -35,7 +35,8 @@ def exportStatus():
 		"last_updated_date_old",
 		"status_summary_old",
 		"timestamp",
-		"change_date"
+		"change_date",
+		"received_date"
 		]
 
 	counter = 0
@@ -55,6 +56,7 @@ def exportStatus():
 				writer.writerow(mCase)
 				counter += 1
 
+	zipfile(output_filename, "output/archive/status_%s.zip" % datetime.now().strftime("%m.%d.%Y"))
 	print "Written %d rows to '%s'." % (counter, output_filename)
 
 def exportProxies(proxies): # This is only called by status_scraper
@@ -66,7 +68,9 @@ def exportProxies(proxies): # This is only called by status_scraper
 	fieldnames = [
 		"link",
 		"good",
-		"bad"
+		"ip_blocked",
+		"timeout",
+		"other_bad"
 		]
 
 	counter = 0
@@ -86,6 +90,18 @@ def exportProxies(proxies): # This is only called by status_scraper
 			counter += 1
 
 	print "Written %d rows to '%s'." % (counter, output_filename)
+
+def zipfile(srcfile, dstfile):
+	import os
+	import zipfile
+	import zlib
+
+	print "Zipping %s to %s" % (srcfile, dstfile)
+
+	zf = zipfile.ZipFile(dstfile, "w", zipfile.ZIP_DEFLATED)
+	zf.write(srcfile)
+
+	zf.close()
 
 def main():
 	exportStatus()

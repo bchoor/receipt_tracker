@@ -21,22 +21,28 @@ import SocketServer
 import json
 
 url = "https://egov.uscis.gov/cris/Dashboard/CaseStatus.do"
-numWorkers = 16							# Number of Workers
+numWorkers = 24							# Number of Workers
 delay = 5								# Worker thread delay
+
+dtToday = datetime.now().replace( 		# Just get the date (remove time)
+			hour=0, 
+			minute=0, 
+			second=0, 
+			microsecond=0)  
+startTime = datetime.now()				# To calculate script processing stats
 
 class db:
 	# Filter parameters for query
 	_filter_forms = [						# Other forms can also be added
-		#"NEW",			
+		"NEW",			
 	    "I485"			
 		]
-	_filter_date = datetime(2014, 02, 28)	# Less than this date (year, month, day, hour, minute, second, millisecond)
+	_filter_date = dtToday # datetime(2014, 03, 9)	# Less than this date (year, month, day, hour, minute, second, millisecond)
 	_filter_status = [ 						# These are ignored
 		"Card/ Document Production"
 		]
 	_filter_status_summary = [				# These are ignored
 		"was not properly filed",
-		"transferred",
 		"mailed a notice acknowledging withdrawal of this application or petition I485"
 		]
 
@@ -67,7 +73,7 @@ class db:
 		self.u_cases_totalrecords = len(self.u_cases)
 
 	def u_cases_next(self):
-		''' Returns a Dict of field/value pairs
+		''' Returns a Dict of field/value pairs; include the _id field for Mongo
 		'''
 		self.u_cases_recordnumber += 1
 
@@ -82,13 +88,6 @@ class db:
 			as key for making the save
 		'''
 		self._conn_u_cases.save(case)
-
-dtToday = datetime.now().replace( 		# Just get the date (remove time)
-			hour=0, 
-			minute=0, 
-			second=0, 
-			microsecond=0)  
-startTime = datetime.now()				# To calculate script processing stats
 
 # RegEx pattern definitions
 pat_form = re.compile('.*Form(.*)[,].')
@@ -145,8 +144,9 @@ def proxies_setup ():
 		proxies = []
 		with open('proxies.csv','r') as f:
 			for line in f.readlines():
-				line = line.rstrip('\n')
-				proxies.append({"link":line, "good": 0, "bad": 0})
+				if line != "":
+					line = line.rstrip('\n')
+					proxies.append({"link":line, "good": 0, "ip_blocked": 0, "timeout": 0, "other_bad": 0})
 		logging.info("Loaded proxies: %r" % proxies)
 	finally:
 		lock.release()	
@@ -201,10 +201,10 @@ def get_page (values):
 		proxy["good"] += 1
 		return (response.read(), proxy)
 	except urllib2.URLError, e:
-		proxy["bad"] += 1
+		proxy["timeout"] += 1
 		raise Exception(["Possible timeout error with proxy %s" % proxy])
 	except Exception, e:
-		proxy["bad"] += 1
+		proxy["other_bad"] += 1
 		raise Exception(["Issue in establishing proxy handler for: %r" % e])
 
 def casestatus_get (serviceCenter, caseNumber):
@@ -230,7 +230,7 @@ def casestatus_get (serviceCenter, caseNumber):
 	if soup.findAll('span', {'class': 'workAreaMessage'}):
 		if soup.findAll('span', {'class': 'workAreaMessage'})[0].findAll('b', {'class': 'error'}):
 			proxy = the_page[1]
-			proxy["bad"] += 1
+			proxy["ip_blocked"] += 1
 			proxy["good"] -= 1
 			raise Exception("On proxy %s: %s" % (proxy, soup.findAll('span', {'class': 'workAreaMessage'})[0].findAll('b', {'class': 'error'})[0].text))
 
@@ -330,8 +330,8 @@ def updateWorker(worker_num):
 				# If exception, re-put into q_in queue
 				errMessage = "#%s had an exception processing receipt %s%d: %r. We will retry it." % (worker_num, case["service_center"], case["receipt_number"], e)
 				logging.error(errMessage)
-				q_in.task_done()
-				q_in.put(case)
+				q_in.task_done()			# finish this task
+				q_in.put(case)				# re-add it to the queue
 			finally:
 				aliveThreads -= 1
 
@@ -339,19 +339,7 @@ def updateWorker(worker_num):
 def queueManager():
 	''' queueManager
 		On a 1s interval, it checks the size of q_in, and whether the "turnOff" flagged
-		has been set. It will fill q_in with next cases until q_in is < numWorkers - 3
-
-		the pymongo cursor has a timeout period, i.e. time after which the cursor is
-		not valid anymore. the current exception handling has done a poor job of 
-		effectively catching that timeout. what is occurring right now is the queueManager
-		has an exception, which does not get handled for some reason. this results in the 
-		thread to stop processing, and turnoff never gets flagged causing the system
-		to continue to loop with no new records to process. 
-
-		the implementation should effectively catch a timeout on the cursor, cleanly
-		stop the updateworker (or prevent a save), then reload the cursor where it stopped.
-		the issue is figuring out how to get the updateworker to stop processing once
-		such an error occurs; and to restart only once a the cursor is renewed.		
+		has been set. It will fill q_in with next cases until q_in is < numWorkers - 3	
 	'''
 	global UCases
 	global turnOff
@@ -363,13 +351,6 @@ def queueManager():
 				newCase = UCases.u_cases_next()
 				logging.info("queueManager adding new case to queue with receipt: %s%d" % (newCase["service_center"], newCase["receipt_number"]))
 				q_in.put(newCase)
-		except StopIteration, e:
-			logging.info("queueManager could not find any more cases. Exiting.")
-			turnOff = True
-		except pymongo.errrors.CursorNotFound, e:
-			logging.info("queueManager: cursor timed out; exiting. There might still be some un-finished cases, you might need to re-run the scraper.")
-			# Need to figure out a way to reload the cursor, instead of forcing a turn off
-			turnOff = True
 		except Exception, e:
 			logging.error("queueManager Exception: %r" % e)
 			turnOff = True
@@ -392,9 +373,9 @@ def interrupter():
 				proxies_setup()
 				print "Proxies: %r" % proxies
 			elif inp == "1":
-				print "Proxy Link / Good / Bad "
+				print "Proxy Link / Good / IP Blocked / TimeOut / Bad (Other) "
 				for p in proxies:
-					print "%s %d/%d" % (p["link"], p["good"], p["bad"])
+					print "%s %d/%d/%d/%d" % (p["link"], p["good"], p["ip_blocked"], p["timeout"], p["other_bad"])
 			elif inp == "4":
 				print "Exiting cleanly. %d items will finish processing." % aliveThreads
 				q_in.queue.clear()
