@@ -535,7 +535,7 @@ def main():
 		for i in range(0, numWorkers + 1):
 			q_in.put(UCases.u_cases_next())
 	elif UCases.u_cases_totalrecords > 0:
-		for i in curCases.u_cases:
+		for i in UCases.u_cases:
 			q_in.put(i)
 	else:
 		print "No records to update."
