@@ -1,0 +1,32 @@
+status_regex
+"a change was made to your receipt notice for the filing of your (I102|I129F|I130|I131|I140|I601|I290B|I485|I765|I817|I821D|I824)[,] (.*)[.]"
+"a fingerprint fee deficiency notice for this case I131 APPLICATION FOR USCIS TRAVEL DOCUMENT was mailed to you advising you that we have not received the finger print fee, the correct amount, or a signed check or money order"
+"a notice was generated regarding your I290B, NOTICE OF APPEAL TO THE COMMISSIONER"
+"a notice was generated regarding your I601, Application for Waiver of Grounds of Inadmissibility"
+a USCIS office received this case from the State Department with a request that we review it
+the appropriate American Consulate or port of entry was notified of the approval of this case. Please contact them directly if you need more information.
+the document we manufactured in this case was personally delivered.
+the post office returned your (.*) as undeliverable
+the previous decision made on your case was revoked and we mailed you a notice explaining the decision
+"the review of your I290B, NOTICE OF APPEAL TO THE COMMISSIONER was completed"
+this I140 IMMIGRANT PETITION FOR ALIEN WORKER was approved and we sent you an e-mail notice
+we destroyed the card which you returned to us with correspondence
+we mailed a notice acknowledging withdrawal of this application or petition (I102|I129F|I130|I131|I140|I601|I290B|I485|I765|I817|I821D|I824)
+"we mailed the Fingerprint and Biometrics Appointment Notice to you, indicating date, time, and place for your appointment"
+we mailed you a notice indicating we intend to rescind the decision on your case
+"we mailed you a notice informing you that your (I102|I129F|I130|I131|I140|I601|I290B|I485|I765|I817|I821D|I824) (.*)[,] was reopened"
+we mailed you a notice terminating your status
+we mailed you a notice that we certified our approval of this case and sent it to the appropriate appellate body for review
+"we received this (I102|I129F|I130|I131|I140|I601|I290B|I485|I765|I817|I821D|I824|EOIR29) (.*)[,] and mailed you a notice describing how we will process your case"
+"we received your correspondence for your I485, APPLICATION TO REGISTER PERMANENT RESIDENCE OR TO ADJUST STATUS"
+we received your Employment Authorization Document or Permanent Resident Card with a letter from you
+"we rejected this case I129F, PETITION FOR FIANCE(E), because you did not resubmit payment to correct the insufficient funds notice"
+"we sent you a notice that the interview scheduled for your I485, APPLICATION TO REGISTER PERMANENT RESIDENCE OR TO ADJUST STATUS was canceled by USCIS"
+"we shipped this approved or re-affirmed case to the Department of State for visa processing. For more information, please contact them directly."
+"we suspended processing of this I129F, PETITION FOR FIANCE(E), because the fee payment was returned by the bank due to insufficient funds"
+your advance parole document was produced
+your appeal was dismissed
+"your (I485|I765)[,](.*) was terminated because you acquired status or the benefit being sought through other means"
+your (name|date of birth|address|Alien Registration Number) was (updated|changed) relating to your (I102|I129F|I130|I131|I140|I601|I290B|I485|I765|I817|I821D|I824)
+your refugee travel document was produced
+your Travel Document was processed and mailed to the address on record
